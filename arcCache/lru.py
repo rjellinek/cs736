@@ -8,27 +8,28 @@ class CacheItem():
   def __init__(self, addr):
     self.age = time.time()
     self.addr = addr
-    #self.data = data
 
 class Cache():
   def __init__(self, maxSize):
-    self.items = [] #Queue.PriorityQueue(maxSize)
-    self.maxSize = maxSize
+    self.items = []
+    self.size = maxSize
 
-  def add(self, item): 
-    time.sleep(.1)
-
+  def get(self, addr): 
     # see if item is in cache; if it is,
-    # get the value and update its position in the cache
-    val = self.search(item.addr)
+    index = self.search(addr)
 
-    # item was not in cache
-    if val is None:
-      # if it's full and we're inserting, we need to evict first
-      if len(self.items) >= self.maxSize:
+    # is in the cache
+    if index != -1:
+      # put the item at the top of the list
+      del self.items[index]
+    # cache is full, pop something
+    else:
+      if len(self.items) >= self.size:
         self.items.pop()
-      item.age = time.time()
-      self.items.insert(0, item)
+        
+    item = CacheItem(addr)
+    self.items.insert(0, item) 
+
   
   def search(self, addr):
     '''
@@ -37,12 +38,8 @@ class Cache():
     '''
     for i in range(len(self.items)):
       if self.items[i].addr == addr:
-        val = self.items[i]
-        val.age = time.time()
-        del(self.items[i])
-        self.items.insert(0, val)
-        return val
-    return None
+        return i
+    return -1
 
   def printCache(self):
     output = ''
@@ -51,28 +48,30 @@ class Cache():
     
     print output
 
-def loadCache(fname, cache):
+def loadCache(fname, cache, timesToLoad=1):
   f = open(fname, 'r')
   for line in f.readlines():
-    item = CacheItem(line.split('\n')[0])
-    print 'Adding:\t%s\t%s' %(item.addr, item.age)
-    cache.add(item)
+    # print 'Adding:\t%s\t%s' %(item.addr, item.age)
+    cache.get(line.split('\n')[0])
   f.close()
   return cache
+ 
+def runTest(cache, fname):
+  print 'Running test on cache with maxSize=%d' % cache.maxSize
+  
 
 if __name__ == '__main__':
   fname = sys.argv[1]
   csize = sys.argv[2]
   cache = Cache(csize)
   cache = loadCache(fname, cache)
-  print 'Cache: '
+  #print 'Cache: '
   cache.printCache()
 
-  # test:
-  lst = ['1234', '4312']
+  lst = ['11', '22', '33', '44']
   for item in lst:
     print 'Adding %s:' % item
-    cache.add(CacheItem(item))
+    cache.get(item)
     print 'Cache:' 
     cache.printCache()
 

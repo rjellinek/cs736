@@ -10,104 +10,38 @@ class CacheItem():
   def __init__(self, addr):
     self.age = time.time()
     self.addr = addr
-    #self.data = data
 
-class ArcCache():
+class LRU():
   def __init__(self, maxSize):
-    self.t1 = Cache(maxSize)
-    self.t2 = Cache(maxSize)
-    self.b1 = Cache(maxSize)
-    self.b2 = Cache(maxSize)
+    self.items = []
+    self.size = maxSize
+    self.name = 'LRU cache'
+    self.hits = 0
 
-  def add(self, item):
-    # search t2 (remember: search() updates item, pulls
-    # it to top of t2)
-    i = self.t2.search(item.addr)
-
-    # it's in t2, update it an put it at top of t2
-    if i != -1:
-      val = self.t2.items[i]
-      val.age = time.time()
-      del(self.t2.items[i])
-      self.t2.items.add(val)
-      return
-
-    # check if it's in t1. If so, take it from t1 and 
-    # put it in t2
-    i = self.t1.search(item.addr)
-    if i != -1:
-      # evict from t1
-      val = self.t1.items[i]
-      val.age = time.time()
-      del(self.t1.items[i])
-      self.t2.add(val)
-      return
-
-    # if it's in b1, delete from b1 and add to t2
-    i = self.b1.search(item.addr)
-    if i != -1:
-      # evict from b1
-      val = self.b1.items[i]
-      val.age = time.time()
-      del(self.b1.items[i])
-      self.t2.add(val)
-      return
-
-
-    # if it's in b2, delete from b2 and add to t2
-    i = self.b2.search(item.addr)
-    if i != -1:
-      # evict from b2
-      val = self.b2.items[i]
-      val.age = time.time()
-      del(self.b2.items[i])
-      self.t2.add(val)
-      return
-
-    # Else, if it's not in any cache, add it to t1
-    self.t1.add(item)
-
-
-      
-
-class Cache():
-  def __init__(self, maxSize):
-    self.items = [] #Queue.PriorityQueue(maxSize)
-    self.maxSize = maxSize
-
-  def add(self, item): 
-    time.sleep(.1)
-
+  def get(self, addr): 
     # see if item is in cache; if it is,
     # get the value and update its position in the cache
-    i = self.search(item.addr)
+    index = self.search(addr)
 
-    # item was not in cache
-    if i == -1:
-      # if it's full and we're inserting, we need to evict first
-      if len(self.items) >= self.maxSize:
-        self.items.pop()
-      item.age = time.time()
-      self.items.insert(0, item)
+    if index != -1:
+      self.hits += 1
+      del self.items[index]
     else:
-      val = self.items[i]
-      val.age = time.time()
-      del(self.items[i])
-      self.items.insert(0, val)
-      
+      if len(self.items) >= self.size:
+        self.items.pop()
+        
+    item = CacheItem(addr)
+    self.items.insert(0, item) 
+
   
   def search(self, addr):
     '''
-    return index of item in cache list
+    update timestamp and put item at top of list.
+    return the val.
     '''
     for i in range(len(self.items)):
       if self.items[i].addr == addr:
         return i
-        #val = self.items[i]
-        #val.age = time.time()
-        #del(self.items[i])
-        #self.items.insert(0, val)
-        #return val
     return -1
 
   def printCache(self):
@@ -117,28 +51,124 @@ class Cache():
     
     print output
 
+class ArcCache():
+  def __init__(self, cacheSize):
+    self.t1 = LRU(0)
+    self.t2 = LRU(0)
+    self.b1 = LRU(0)
+    self.b2 = LRU(0)
+    self.size = 0    # p in the paper
+    self.cache_size = cacheSize # c  in the paper
+    self.hits = 0
+    self.name = 'ArcCache'
+
+  def get(self, addr):
+    item = CacheItem(addr)
+    # search t2 and t1 (remember: search() updates item, pulls
+    # it to top of t2)
+    t2_index = self.t2.search(addr)
+
+    # it's in t2, update it an put it at top of t2
+    if t2_index != -1:
+      del self.t2.items[t2_index]
+      self.t2.items.insert(0, item) 
+      self.hits = self.hits + 1
+      return
+
+    # check if it's in t1. If so, take it from t1 and 
+    # put it in t2
+    t1_index = self.t1.search(addr)
+    if t1_index != -1:
+      del self.t1.items[t1_index]
+      self.t2.items.insert(0, item)  
+      self.hits = self.hits + 1
+      return
+
+    # if it's in b1, delete from b1 and add to t2
+    b1_index = self.b1.search(addr)
+    if b1_index != -1:
+      segma1 = computeSegma1()
+      newSize = min(self.size + segma1, self.cache_size)
+      del self.b1.items[b1_index]
+      self.t2.items.insert(0, item)
+      replace(item, newSize)
+      self.hits += 1
+      return
+
+    # if it's in b2, delete from b2 and add to t2
+    b2_index = self.b2.search(addr)
+    if b2_index != -1:
+      segma2 = computeSegma2()
+      newSize = max(self.size - segma2, 0)
+      del self.b2.items[b2_index]
+      self.t2.items.insert(0, item)      
+      replace(item, newSize)
+      self.hits += 1
+      return
+
+    if (len(self.t1.items) + len(self.b1.items)) == self.cache_size:
+      if len(self.t1.items) < self.cache_size:
+        self.b1.items.pop()
+        replace(item, self.size)
+      else:
+        self.t1.items.pop()
+        self.size = self.size - 1
+    else:
+      if (len(self.t1.items) + len(self.b1.items) + len(self.t2.items) + len(self.b2.items)) >= self.cache_size:
+        self.b2.items.pop()
+        replace(item, self.size)
+          
+    # Else, if it's not in any cache, add it to t1
+    self.t1.items.insert(0, item)
+    self.size = self.size + 1
+
+def replace(item, newSize):
+  b2_index = self.b2.search(addr)
+  if (len(self.t1.items) > 0 and len(self.t1.items) > newSize) or (b2_index != -1 and len(self.t1.items) == newSize):
+    self.t1.items.pop()
+    self.b1.items.insert(0, item)
+  else:
+    self.t2.items.pop()
+    self.b2.items.insert(0, item)      
+
+def computeSegma1():
+  if len(self.b1.items) >= len(self.b2.items):
+    return 1
+  else:
+    return len(self.b2.items)/len(self.b1.items)
+  
+def computeSegma2():
+  if len(self.b2.items) >= len(self.b1.items):
+    return 1
+  else:
+    return len(self.b1.items)/len(self.b2.items)  
+
 def loadCache(fname, cache):
   f = open(fname, 'r')
+  numReqs = 0
   for line in f.readlines():
-    item = CacheItem(line.split('\n')[0])
-    print 'Adding:\t%s\t%s' %(item.addr, item.age)
-    cache.add(item)
+    cache.get(line.split('\n')[0])
+    numReqs += 1
   f.close()
-  return cache
+  return numReqs
 
 if __name__ == '__main__':
   fname = sys.argv[1]
   csize = sys.argv[2]
-  cache = Cache(csize)
-  cache = loadCache(fname, cache)
-  print 'Cache: '
-  cache.printCache()
+  
+  cache = ArcCache(csize)
+  numReqs = loadCache(fname, cache)
+  print 'Loaded %d unique entries into %s' % (numReqs, cache.name)
+  print 'Reloading same entries into %s:' % cache.name
+  numReqs = loadCache(fname, cache)
+  print 'Hits: %d\tMisses: %d\n' % (cache.hits, numReqs - cache.hits)
 
-  # test:
-  lst = ['1234', '4312']
-  for item in lst:
-    print 'Adding %s:' % item
-    cache.add(CacheItem(item))
-    print 'Cache:' 
-    cache.printCache()
+  cache = LRU(csize)
+  numReqs = loadCache(fname, cache)
+  print 'Loaded %d unique entries into %s' % (numReqs, cache.name)
+  print 'Reloading same entries into %s:' % cache.name
+  numReqs = loadCache(fname, cache)
+  print 'Hits: %d\tMisses: %d\n' % (cache.hits, numReqs - cache.hits)
 
+
+  
