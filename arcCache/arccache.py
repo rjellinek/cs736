@@ -82,12 +82,13 @@ class ArcCache():
       del self.t1.items[t1_index]
       self.t2.items.insert(0, item)  
       self.hits = self.hits + 1
+      self.size -= 1
       return
 
     # if it's in b1, delete from b1 and add to t2
     b1_index = self.b1.search(addr)
     if b1_index != -1:
-      segma1 = computeSegma1()
+      segma1 = self.computeSegma1()
       newSize = min(self.size + segma1, self.cache_size)
       del self.b1.items[b1_index]
       self.t2.items.insert(0, item)
@@ -98,7 +99,7 @@ class ArcCache():
     # if it's in b2, delete from b2 and add to t2
     b2_index = self.b2.search(addr)
     if b2_index != -1:
-      segma2 = computeSegma2()
+      segma2 = self.computeSegma2()
       newSize = max(self.size - segma2, 0)
       del self.b2.items[b2_index]
       self.t2.items.insert(0, item)      
@@ -108,40 +109,42 @@ class ArcCache():
 
     if (len(self.t1.items) + len(self.b1.items)) == self.cache_size:
       if len(self.t1.items) < self.cache_size:
-        self.b1.items.pop()
-        replace(item, self.size)
+        if self.b1.items:
+          self.b1.items.pop()
+        self.replace(item, self.size)
       else:
         self.t1.items.pop()
         self.size = self.size - 1
     else:
       if (len(self.t1.items) + len(self.b1.items) + len(self.t2.items) + len(self.b2.items)) >= self.cache_size:
-        self.b2.items.pop()
-        replace(item, self.size)
+        if self.b2.items:
+          self.b2.items.pop()
+        self.replace(item, self.size)
           
     # Else, if it's not in any cache, add it to t1
     self.t1.items.insert(0, item)
     self.size = self.size + 1
 
-def replace(item, newSize):
-  b2_index = self.b2.search(addr)
-  if (len(self.t1.items) > 0 and len(self.t1.items) > newSize) or (b2_index != -1 and len(self.t1.items) == newSize):
-    self.t1.items.pop()
-    self.b1.items.insert(0, item)
-  else:
-    self.t2.items.pop()
-    self.b2.items.insert(0, item)      
-
-def computeSegma1():
-  if len(self.b1.items) >= len(self.b2.items):
-    return 1
-  else:
-    return len(self.b2.items)/len(self.b1.items)
-  
-def computeSegma2():
-  if len(self.b2.items) >= len(self.b1.items):
-    return 1
-  else:
-    return len(self.b1.items)/len(self.b2.items)  
+  def replace(self, item, newSize):
+    b2_index = self.b2.search(item.addr)
+    if (len(self.t1.items) > 0 and len(self.t1.items) > newSize) or (b2_index != -1 and len(self.t1.items) == newSize):
+      self.t1.items.pop()
+      self.b1.items.insert(0, item)
+    else:
+      self.t2.items.pop()
+      self.b2.items.insert(0, item)      
+    
+  def computeSegma1(self):
+    if len(self.b1.items) >= len(self.b2.items):
+      return 1
+    else:
+      return len(self.b2.items)/len(self.b1.items)
+    
+  def computeSegma2(self):
+    if len(self.b2.items) >= len(self.b1.items):
+      return 1
+    else:
+      return len(self.b1.items)/len(self.b2.items)  
 
 def loadCache(fname, cache):
   f = open(fname, 'r')
