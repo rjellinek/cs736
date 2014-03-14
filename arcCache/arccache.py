@@ -157,20 +157,20 @@ def loadCache(fname, cache):
 
 if __name__ == '__main__':
   fname = sys.argv[1]
-  csize = sys.argv[2]
+  csize = int(sys.argv[2])
   
   cache = ArcCache(csize)
   numReqs = loadCache(fname, cache)
   print 'Loaded %d unique entries into %s' % (numReqs, cache.name)
   print 'Reloading same entries into %s:' % cache.name
-  numReqs = loadCache(fname, cache)
+  numReqs = 2 * loadCache(fname, cache)
   print 'Hits: %d\tMisses: %d\n' % (cache.hits, numReqs - cache.hits)
 
   cache = LRU(csize)
   numReqs = loadCache(fname, cache)
   print 'Loaded %d unique entries into %s' % (numReqs, cache.name)
   print 'Reloading same entries into %s:' % cache.name
-  numReqs = loadCache(fname, cache)
+  numReqs = 2 * loadCache(fname, cache)
   print 'Hits: %d\tMisses: %d\n' % (cache.hits, numReqs - cache.hits)
 
 

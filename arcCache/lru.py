@@ -62,7 +62,7 @@ def runTest(cache, fname):
 
 if __name__ == '__main__':
   fname = sys.argv[1]
-  csize = sys.argv[2]
+  csize = int(sys.argv[2])
   cache = Cache(csize)
   cache = loadCache(fname, cache)
   #print 'Cache: '
