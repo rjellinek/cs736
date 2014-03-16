@@ -2,9 +2,8 @@
 import sys
 import time
 
-## print FINAL hits misses
-
-# Input: read a stream of numbers
+# Authors:
+# Robert Jellinek, Samer Al-Kiswany, Siva Ramasubramanian
 
 class CacheItem():
   def __init__(self, addr):
@@ -155,7 +154,15 @@ def loadCache(fname, cache):
   f.close()
   return numReqs
 
+def usage():
+  print 'Usage: python arccache.py [trace file] [cache size]'
+
 if __name__ == '__main__':
+  usage()
+  
+  print '\nRun with trace files example-lru.txt and example-arc.txt to ' \
+    'see traces that perform better under LRU and ARC respectively.\n\n'+'*'*80 +'\n\n'
+  
   fname = sys.argv[1]
   csize = int(sys.argv[2])
   
@@ -172,6 +179,4 @@ if __name__ == '__main__':
   print 'Reloading same entries into %s:' % cache.name
   numReqs = 2 * loadCache(fname, cache)
   print 'Hits: %d\tMisses: %d\n' % (cache.hits, numReqs - cache.hits)
-
-
   
