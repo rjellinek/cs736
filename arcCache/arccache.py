@@ -91,7 +91,7 @@ class ArcCache():
       newSize = min(self.size + segma1, self.cache_size)
       del self.b1.items[b1_index]
       self.t2.items.insert(0, item)
-      replace(item, newSize)
+      self.replace(item, newSize)
       self.hits += 1
       return
 
@@ -102,7 +102,7 @@ class ArcCache():
       newSize = max(self.size - segma2, 0)
       del self.b2.items[b2_index]
       self.t2.items.insert(0, item)      
-      replace(item, newSize)
+      self.replace(item, newSize)
       self.hits += 1
       return
 
