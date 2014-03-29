@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 
+##
+## Rob Jellinek and Siva Ramasubramanian
+## 
+
 import sys
 
-# maps thread_id -> [(addr,op)...]
-threads = {}
-
 # maps thread_id -> [locks]
-# 1: 
 locks_held = {}
 
-# map address -> set(locks held)
+# map variable -> set(locks held)
 C = {}
+
+# dict of {var:set of threads using it}
+# if |thread_set| > 1, var is initialized 
+initialized = {}
 
 def populate_C(filename):
   '''
@@ -23,25 +27,38 @@ def populate_C(filename):
     # populate all addresses (all variables)
     # i.e. create C(v) for each v
     for line in trace:
-      thread_id, addr, op = line.split(',')
-      if addr not in C:
-        C[addr] = set()
-    
+      if '#' in line:
+        continue
+      thread_id, var, op = line.split(',')
+      if var not in C:
+        C[var] = set()
 
+      if var not in initialized:
+        initialized[var] = set()
+      
+      # populate locks_held table at the same time. 
+      # this is important for threads that initially 
+      # access vars without locks, before they're initialized.
+      if thread_id not in locks_held:
+        locks_held[thread_id] = set() 
+    
     # for each v (addr), initialize C(v) (C[addr]) to the set of all locks
     for line in trace:
+      if '#' in line:
+        continue
       thread_id, lock_addr, op = line.split(',')
       if 'l' in op: # not differentiating r/w locks here
         for addr in C:
           C[addr].add(lock_addr) # represents a lock on the var corresponding
                                     # to the operations's address
-    print 'C: '
-    print C
 
 def process_entry(entry):
   '''
   //lock trace format: addrRL, addrWL
   '''
+  if '#' in entry:
+    return
+
   thread_id, addr, op = entry.split(',')
   
   if 'l' in op:
@@ -54,8 +71,9 @@ def process_entry(entry):
         print 'Error, thread %s is holding the lock while thread %s is ' \
           'requesting it' % (t, thread_id)
         sys.exit()
-
+    
     locks_held[thread_id].add(addr)
+    initialized[addr].add(thread_id)
     
   elif 'u' in op:
     if thread_id not in locks_held:
@@ -64,14 +82,20 @@ def process_entry(entry):
       locks_held[thread_id].remove(addr)
 
   elif 'r' in op or 'w' in op:
-    C[addr].intersection_update(locks_held[thread_id])
-    print 'C[%s] = ' % addr
-    print C[addr]
-    if not len(C[addr]):
+    if len(initialized[addr]) > 1:
+      print 'updating intersection because %s is initialized!' % addr
+      C[addr].intersection_update(locks_held[thread_id])
+    initialized[addr].add(thread_id)
+    
+    print 'rw initialized[%s]: ' % addr
+    print initialized[addr]
+
+    # if the intersection's empty and the var's been initialized, it's a problem
+    if not len(C[addr]) and len(initialized[addr]) > 1:
       print 'ERROR! C[%s] is empty, lock not protecting shared resource!' % addr
+      print 'intiialized[%s]' % addr
+      print initialized[addr]
       sys.exit()
-  print 'locks_held'
-  print locks_held
 
 def print_Cs():
   for addr in C:
@@ -87,6 +111,9 @@ def run(filename):
   with open(filename,'r') as fp:
     trace = fp.readlines()
     for line in trace:
+      print '\n'
+      print '*'*60
+      print line
       print_Cs()
       print '\n\n\n'
       process_entry(line)
