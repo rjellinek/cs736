@@ -25,12 +25,16 @@ class Entry():
   def __str__(self):
     #return ('%s\n\t<a href="%s">%s</a>\n\t%s\n\t%s\n\n') % (self.email,
     #  self.address, self.title, self.target_files, self.body)
-    return ('<a href="%s">%s</a>%s\t%s\t' + '\t'*10) % (self.address,
-    self.title, self.target_files[0], self.body)
+    try:
+      target = self.target_files[0]
+    except:
+      target = ''
+    return ('=HYPERLINK("%s","%s")\t%s' + '\t'*10 + '%s') % (self.address,
+    self.title, target, self.body)
 
   def add_entry(self, entry_lines):
-    self.email = entry_lines[0]
-    self.title = entry_lines[1]
+    self.email = entry_lines[0].strip()
+    self.title = entry_lines[1].strip()
     self.body  = ' '.join(entry_lines[2:])
     self.body = re.sub('\s+', ' ', self.body)
     self.address = ''
@@ -44,7 +48,16 @@ class Entry():
       return False
     
     url = GMANE_SEARCH % urllib2.quote(self.title)
-    response = urllib2.urlopen(url)
+    tries = 0
+    while tries < 3:
+      try:
+        response = urllib2.urlopen(url)
+        break
+      except:
+        tries += 1
+    if tries == 3:
+      print 'Failed to fetch address for %s' % self.title
+      return False
     htmlparser = etree.HTMLParser()
     tree = etree.parse(response, htmlparser)
     elem = tree.xpath(self.gmane_xpath)
@@ -80,6 +93,15 @@ def line_is_start(line):
   '''
   return len(re.findall('^<\S+@\S+\.\S+>', line)) > 0
 
+def should_add(title):
+  '''
+  Return true if any of our trigger terms is in the title
+  '''
+  for term in triggerTerms:
+    if term.lower() in title.lower():
+      return True
+  return False
+
 def parse_changelog_entries(lines):
   '''
   loop over changelog lines and parse into 
@@ -90,16 +112,20 @@ def parse_changelog_entries(lines):
  
   # Add entries
   for i in range(len(lines)):
-    print 'line %d: %s' % (i, lines[i])
+    #print 'line %d: %s' % (i, lines[i])
     if line_is_start(lines[i]):
-      print 'line is start line, start=%d' % i
+      #print 'line is start line, start=%d' % i
       if start > 0:
-        print 'appending entry of lines %d..%d' % (start, i)
-        entries.append(Entry(lines[start:i]))
-            
+        #print 'appending entry of lines %d..%d' % (start, i)
+        entry = Entry(lines[start:i])
+
+        if should_add(lines[start+1]):
+          entries.append(entry)
+          print entry
+
         ##TODO: delete after debug
-        if len(entries) == 3:
-          return entries
+        #if len(entries) == 3:
+        #return entries
       start = i
   
   return entries 
@@ -112,8 +138,8 @@ def main(changelog):
   
   entries = parse_changelog_entries(lines)
   
-  for entry in entries:
-    print entry
+  #for entry in entries:
+  #  print entry
 
 
 if __name__ == '__main__':
