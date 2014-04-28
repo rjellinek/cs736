@@ -8,7 +8,10 @@ import urllib2
 from lxml import etree
 
 triggerTerms = ['net', 'IPV4', 'IPV6', 'NETFILTER', 'tcp', 'RTNETLINK',
-                'bridge', 'wireless', 'PKT_SCHED']
+                'bridge', 'wireless', 'PKT_SCHED', 'SCTP', 'PPPOE', 'DECNET',
+                'NETLINK', 'IPX', 'ECONET', 'netdrvr', 'PKTGEN', 'network',
+                'IPSEC','Ethernet', 'AF_PACKET', 'vlan', 'router', 'net_sched',
+                'af_unix', 'ipvs']
 
 GMANE_SEARCH = 'http://search.gmane.org/?query=%s'
 
@@ -25,12 +28,15 @@ class Entry():
   def __str__(self):
     #return ('%s\n\t<a href="%s">%s</a>\n\t%s\n\t%s\n\n') % (self.email,
     #  self.address, self.title, self.target_files, self.body)
-    try:
-      target = self.target_files[0]
-    except:
-      target = ''
-    return ('=HYPERLINK("%s","%s")\t%s' + '\t'*10 + '%s') % (self.address,
-    self.title, target, self.body)
+    
+    target = ','.join(self.stats['files'])
+    return ('=HYPERLINK("%s","%s")\t%s' + ' \t'*8 + ('%s\t'*3)+ '%s\n') % (self.address,
+      self.title, 
+      target, 
+      self.stats['files_changed'], 
+      self.stats['insertions'],
+      self.stats['deletions'], 
+      self.body)
 
   def add_entry(self, entry_lines):
     self.email = entry_lines[0].strip()
@@ -38,9 +44,11 @@ class Entry():
     self.body  = ' '.join(entry_lines[2:])
     self.body = re.sub('\s+', ' ', self.body)
     self.address = ''
-    self.get_address()
+    if not self.get_address():
+      return False
     self.target_page = self.get_comment_page()
-    self.get_target_file(self.target_page)
+    self.get_stats(self.target_page)
+    return True
 
   def get_address(self):
     if not hasattr(self, 'email'):
@@ -61,7 +69,10 @@ class Entry():
     htmlparser = etree.HTMLParser()
     tree = etree.parse(response, htmlparser)
     elem = tree.xpath(self.gmane_xpath)
-    link = elem[0].attrib['href']
+    try:
+      link = elem[0].attrib['href']
+    except:
+      return False
     self.address = link
     return True
 
@@ -78,13 +89,29 @@ class Entry():
     bs = BeautifulSoup(html)
     return bs.text
   
-  def get_target_file(self, comment_page):
+  def get_stats(self, comment_page):
     '''
     Takes comment page in text format, saves file edited.
+    self.stats is saved in form of 
     '''
-    self.num_target_files = re.findall('(\d+) files changed', comment_page)
-    self.target_files = re.findall('--- a(\S+)\s', comment_page)
+    self.stats = {}
     
+    try:
+      self.stats['files_changed'] = re.findall('(\d+) files changed', comment_page)[0]
+    except:
+      self.stats['files_changed'] = '0'
+    try:
+      self.stats['insertions'] = re.findall('(\d+) insertions?\(\+\)', comment_page)[0]
+    except:
+      self.stats['insertions'] = '0'
+    try:
+      self.stats['deletions'] = re.findall('(\d+) deletions?\(-\)', comment_page)[0]
+    except:
+      self.stats['deletions'] = '0'
+    try:
+      self.stats['files'] = re.findall('--- a(\S+)\s', comment_page)
+    except:
+      self.stats['files'] = ' '
   
 def line_is_start(line):
   '''
@@ -102,7 +129,7 @@ def should_add(title):
       return True
   return False
 
-def parse_changelog_entries(lines):
+def parse_changelog_entries(output_file, lines):
   '''
   loop over changelog lines and parse into 
   list of changelog entries
@@ -116,16 +143,21 @@ def parse_changelog_entries(lines):
     if line_is_start(lines[i]):
       #print 'line is start line, start=%d' % i
       if start > 0:
-        #print 'appending entry of lines %d..%d' % (start, i)
-        entry = Entry(lines[start:i])
-
+        print 'Considering entry with title: %s' % lines[start+1]
         if should_add(lines[start+1]):
+          print 'Adding it now: '
+          entry = Entry(lines[start:i])
           entries.append(entry)
+          output_file.write(str(entry))
           print entry
+        else:
+          print 'Did not add'
+        
+        print '*'*80
 
         ##TODO: delete after debug
-        #if len(entries) == 3:
-        #return entries
+        #if len(entries) == 4:
+        #  return entries
       start = i
   
   return entries 
@@ -135,12 +167,9 @@ def main(changelog):
   
   with open(changelog, 'r') as fp:
     lines = fp.readlines()
-  
-  entries = parse_changelog_entries(lines)
-  
-  #for entry in entries:
-  #  print entry
-
+ 
+  with open('%s.output' % changelog, 'w') as output_file:
+    entries = parse_changelog_entries(output_file, lines)
 
 if __name__ == '__main__':
   main(sys.argv[1])
