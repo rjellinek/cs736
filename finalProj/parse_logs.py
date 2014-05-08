@@ -10,8 +10,8 @@ from lxml import etree
 triggerTerms = ['net', 'IPV4', 'IPV6', 'NETFILTER', 'tcp', 'RTNETLINK',
                 'bridge', 'wireless', 'PKT_SCHED', 'SCTP', 'PPPOE', 'DECNET',
                 'NETLINK', 'IPX', 'ECONET', 'netdrvr', 'PKTGEN', 'network',
-                'IPSEC','Ethernet', 'AF_PACKET', 'vlan', 'router', 'net_sched',
-                'af_unix', 'ipvs']
+                'IPSEC','Ethernet', 'AF_PACKET', 'vlan', 'wan', 'lan', 'router',
+                'net_sched', 'af_unix', 'ipvs']
 
 GMANE_SEARCH = 'http://search.gmane.org/?query=%s'
 
