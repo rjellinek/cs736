@@ -29,14 +29,19 @@ class Entry():
     #return ('%s\n\t<a href="%s">%s</a>\n\t%s\n\t%s\n\n') % (self.email,
     #  self.address, self.title, self.target_files, self.body)
     
-    target = ','.join(self.stats['files'])
-    return ('=HYPERLINK("%s","%s")\t%s' + ' \t'*8 + ('%s\t'*3)+ '%s\n') % (self.address,
-      self.title, 
-      target, 
-      self.stats['files_changed'], 
-      self.stats['insertions'],
-      self.stats['deletions'], 
-      self.body)
+    if hasattr(self, 'stats'):
+      target = ','.join(self.stats['files'])
+      return ('=HYPERLINK("%s","%s")\t%s' + ' \t'*8 + ('%s\t'*3)+ '%s\n') % (self.address,
+        self.title, 
+        target, 
+        self.stats['files_changed'], 
+        self.stats['insertions'],
+        self.stats['deletions'], 
+        self.body)
+    
+    # If we couldn't get the stats, at least just save the link
+    else:
+      return ('=HYPERLINK("%s","%s")') % (self.address, self.title)
 
   def add_entry(self, entry_lines):
     self.email = entry_lines[0].strip()
@@ -55,17 +60,22 @@ class Entry():
       print 'Error, have not created Entry yet!'
       return False
     
-    url = GMANE_SEARCH % urllib2.quote(self.title)
+    url = GMANE_SEARCH % urllib2.quote('"%s"' % self.title)
     tries = 0
-    while tries < 3:
+    MAX_TRIES = 5
+    while tries < MAX_TRIES:
       try:
         response = urllib2.urlopen(url)
         break
       except:
+        print 'Retrying...'
+        time.sleep(1)
         tries += 1
-    if tries == 3:
+
+    if tries == MAX_TRIES:
       print 'Failed to fetch address for %s' % self.title
       return False
+
     htmlparser = etree.HTMLParser()
     tree = etree.parse(response, htmlparser)
     elem = tree.xpath(self.gmane_xpath)
