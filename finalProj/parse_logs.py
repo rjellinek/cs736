@@ -6,6 +6,9 @@ import re
 from bs4 import BeautifulSoup
 import urllib2
 from lxml import etree
+import time
+import StringIO
+
 
 triggerTerms = ['net', 'IPV4', 'IPV6', 'NETFILTER', 'tcp', 'RTNETLINK',
                 'bridge', 'wireless', 'PKT_SCHED', 'SCTP', 'PPPOE', 'DECNET',
@@ -55,7 +58,11 @@ class Entry():
     self.get_stats(self.target_page)
     return True
 
-  def get_address(self):
+  def get_first_address(self):
+    '''
+    Get address of Gmane page relating to Changelog status.
+    Naive, just grabs the first link
+    '''
     if not hasattr(self, 'email'):
       print 'Error, have not created Entry yet!'
       return False
@@ -85,6 +92,69 @@ class Entry():
       return False
     self.address = link
     return True
+
+  def get_address(self):
+    '''
+    Get address of Gmane page relating to Changelog status.
+    This is fragile, given Gmane page format, but grabs the correct 
+    link if it's anywhere on the given page. Doesn't search subsequent
+    pages yet, but could be easily extended
+    '''
+    url = GMANE_SEARCH % urllib2.quote('%s' % self.title)
+    tries = 0
+    MAX_TRIES = 5
+
+    # Try to fetch page
+    while tries < MAX_TRIES:
+      try:
+        print 'Trying to fetch %s ' % url
+        response = urllib2.urlopen(url)
+        break
+      except:
+        print 'Retrying...'
+        time.sleep(1)
+        tries += 1
+
+    if tries == MAX_TRIES:
+      print 'Failed to fetch address for %s' % self.title
+      return False
+    
+    # Get html text of response
+    html = response.read()
+    text = BeautifulSoup(html).text
+    link_idx = 0 
+    res_found = False
+    for line in text.split('\n'):
+      if len(re.findall('\(\d+%\)', line)):
+        print 'Found possible result'
+        link_idx += 1
+        if self.title in line:
+          print '\t RESULT!'
+          res_found = True
+          break
+
+    # If we did not find a link, default to first page in list
+    if not res_found:
+      link_idx = 1
+   
+    # Get list of links on page linking to relevant articles
+    htmlparser = etree.HTMLParser()
+    tree = etree.parse(StringIO.StringIO(html), htmlparser)
+    elem = tree.xpath('//@href')
+    rest = []
+    for i,e in enumerate(elem):
+      if 'article.gmane.org' in e:
+        article_links = elem[i:]
+        break
+    
+    # There are 2 links per topic on the page, we want the first
+    # of the two, given our index gotten in the last step.
+    link_idx = (link_idx * 2) - 1
+    try:
+      self.address = article_links[link_idx]
+    except Exception as e:
+      print e
+      self.address = ''
 
   def get_comment_page(self):
     '''
