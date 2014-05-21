@@ -3,18 +3,17 @@
 import sys
 import os
 import re
-from bs4 import BeautifulSoup
-import urllib2
-from lxml import etree
 import time
 import StringIO
-
+import urllib2
+from bs4 import BeautifulSoup
+from lxml import etree
 
 triggerTerms = ['net', 'IPV4', 'IPV6', 'NETFILTER', 'tcp', 'RTNETLINK',
                 'bridge', 'wireless', 'PKT_SCHED', 'SCTP', 'PPPOE', 'DECNET',
                 'NETLINK', 'IPX', 'ECONET', 'netdrvr', 'PKTGEN', 'network',
                 'IPSEC','Ethernet', 'AF_PACKET', 'vlan', 'wan', 'lan', 'router',
-                'net_sched', 'af_unix', 'ipvs']
+                'net_sched', 'af_unix', 'ipvs', 'e1000', 'ethtool']
 
 GMANE_SEARCH = 'http://search.gmane.org/?query=%s'
 
@@ -152,9 +151,11 @@ class Entry():
     link_idx = (link_idx * 2) - 1
     try:
       self.address = article_links[link_idx]
+      return True
     except Exception as e:
       print e
       self.address = ''
+      return False
 
   def get_comment_page(self):
     '''
@@ -164,7 +165,14 @@ class Entry():
     #TODO: error checking and retries!
     # If self.address isn't here, retry self.get_address
     url = self.address
-    response = urllib2.urlopen(url)
+
+    # Fail gracefully and move on
+    try:
+      response = urllib2.urlopen(url)
+    except Exception as e:
+      print e
+      return ''
+    
     html = response.read()
     bs = BeautifulSoup(html)
     return bs.text
@@ -216,11 +224,13 @@ def parse_changelog_entries(output_file, lines):
   '''
   entries = []
   start = -1
- 
+  count = 0 
   # Add entries
   for i in range(len(lines)):
     #print 'line %d: %s' % (i, lines[i])
     if line_is_start(lines[i]):
+#      count +=1  # XXX
+#      continue   # XXX
       #print 'line is start line, start=%d' % i
       if start > 0:
         print 'Considering entry with title: %s' % lines[start+1]
@@ -240,6 +250,7 @@ def parse_changelog_entries(output_file, lines):
         #  return entries
       start = i
   
+  print 'Count: %d' % count
   return entries 
 
 def main(changelog):
@@ -252,4 +263,7 @@ def main(changelog):
     entries = parse_changelog_entries(output_file, lines)
 
 if __name__ == '__main__':
+  if len(sys.argv) < 2:
+    print 'Usage: %s <Changelog filename>' % sys.argv[0]
+    sys.exit()
   main(sys.argv[1])
